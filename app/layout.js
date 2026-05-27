@@ -50,8 +50,12 @@ export async function generateMetadata() {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${rajdhani.variable} ${exo2.variable}`}>
-      <body suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${rajdhani.variable} ${exo2.variable}`}
+      suppressHydrationWarning
+    >
+      <body>
         <SessionWrapper>{children}</SessionWrapper>
       </body>
     </html>
