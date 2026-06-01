@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 import { updateChannel, deleteChannel } from '@/actions/channels';
 import { uploadSingleMediaFile } from '@/lib/media/upload';
 
@@ -23,6 +25,7 @@ export default function ChannelInfoPanel({ activeChannel, onClose, isOpen = true
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
+  const [mounted, setMounted] = useState(false);
   
   const [editForm, setEditForm] = useState({
     name: '',
@@ -39,6 +42,11 @@ export default function ChannelInfoPanel({ activeChannel, onClose, isOpen = true
   });
 
   const [channelData, setChannelData] = useState(activeChannel);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   useEffect(() => {
     setChannelData(activeChannel);
@@ -64,9 +72,10 @@ export default function ChannelInfoPanel({ activeChannel, onClose, isOpen = true
     if (result.success) {
       if (result.channel) setChannelData(result.channel);
       setShowEditModal(false);
+      toast.success('Channel updated successfully');
       router.refresh();
     } else {
-      alert(result.message || 'Failed to update channel');
+      toast.error(result.message || 'Failed to update channel');
     }
   };
 
@@ -100,7 +109,7 @@ export default function ChannelInfoPanel({ activeChannel, onClose, isOpen = true
       router.refresh();
     } catch (error) {
       setAvatarUploadProgress(0);
-      alert(error.message || 'Failed to update avatar');
+      toast.error(error?.message || 'Failed to update avatar');
     } finally {
       setSaving(false);
     }
@@ -114,8 +123,11 @@ export default function ChannelInfoPanel({ activeChannel, onClose, isOpen = true
     if (result.success) {
       setShowDeleteConfirm(false);
       onClose();
+      toast.success('Channel deleted successfully');
       router.push('/channels');
       router.refresh();
+    } else {
+      toast.error(result.message || 'Failed to delete channel');
     }
   };
 
@@ -138,7 +150,10 @@ export default function ChannelInfoPanel({ activeChannel, onClose, isOpen = true
     if (result.success) {
       if (result.channel) setChannelData(result.channel);
       setShowSettings(false);
+      toast.success('Channel settings saved');
       router.refresh();
+    } else {
+      toast.error(result.message || 'Failed to save channel settings');
     }
   };
 
@@ -239,8 +254,6 @@ export default function ChannelInfoPanel({ activeChannel, onClose, isOpen = true
               </>
             )}
           </div>
-
-          <a href="#" style={{color:'var(--green-light)', fontSize:'15px', textDecoration:'none'}}>https://pubgucstore.bd/</a>
         </div>
 
         {/* Settings Options */}
@@ -294,10 +307,11 @@ export default function ChannelInfoPanel({ activeChannel, onClose, isOpen = true
       </div>
 
       {/* ── EDIT CHANNEL MODAL ── */}
-      {showEditModal && (
+      {mounted && showEditModal && createPortal(
         <div style={{
           position: 'fixed', inset: 0, zIndex: 3000,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '16px',
         }}>
           {/* Backdrop */}
           <div
@@ -316,7 +330,7 @@ export default function ChannelInfoPanel({ activeChannel, onClose, isOpen = true
             <div style={{
               padding: '18px 24px', borderBottom: '1px solid var(--border)',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: 'var(--bg-sidebar)',
+              
             }}>
               <h2 className="font-raj" style={{ fontSize: '18px', fontWeight: '700', margin: 0 }}>
                 <i className="fas fa-pen" style={{ color: 'var(--gold)', marginRight: '8px' }}></i>
@@ -354,19 +368,6 @@ export default function ChannelInfoPanel({ activeChannel, onClose, isOpen = true
                 />
               </div>
 
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
-                  Avatar URL
-                </label>
-                <input
-                  type="url"
-                  value={editForm.avatar}
-                  onChange={e => setEditForm({...editForm, avatar: e.target.value})}
-                  className="form-input"
-                  placeholder="https://example.com/avatar.png"
-                />
-              </div>
-
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button type="button" onClick={() => setShowEditModal(false)} className="btn-outline" style={{ flex: 1, justifyContent: 'center' }}>
                   Cancel
@@ -377,7 +378,8 @@ export default function ChannelInfoPanel({ activeChannel, onClose, isOpen = true
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── CHANNEL SETTINGS OVERLAY ── */}

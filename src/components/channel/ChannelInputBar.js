@@ -5,12 +5,13 @@ import CreatePostModal from './CreatePostModal';
 import { createPost } from '@/actions/posts';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 import EmojiPicker from 'emoji-picker-react';
 
 export default function ChannelInputBar({ channelId, isAdmin }) {
   const [showPopover, setShowPopover] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [activeModalType, setActiveModalType] = useState(null); // 'media', 'poll', 'announcement', 'uc-flash-sale', 'royal-pass'
+  const [activeModalType, setActiveModalType] = useState(null); // 'media', 'announcement', 'uc-flash-sale', 'royal-pass'
   const [hasText, setHasText] = useState(false);
   const [isSending, setIsSending] = useState(false);
   
@@ -86,9 +87,11 @@ export default function ChannelInputBar({ channelId, isAdmin }) {
       });
 
       if (!result?.success) {
-        alert(result?.message || 'Failed to publish post');
+        toast.error(result?.message || 'Failed to publish post');
         return;
       }
+
+      toast.success('Post published successfully');
 
       textareaRef.current.innerHTML = '';
       setHasText(false);
@@ -165,11 +168,6 @@ export default function ChannelInputBar({ channelId, isAdmin }) {
                 <span style={{ fontSize: '15px', fontWeight: '500', color: 'var(--text-main)' }}>Photos & videos</span>
               </div>
               
-              <div onClick={() => openModal('poll')} style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg, #FFB02E, #FFD572)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '18px' }}><i className="fas fa-chart-bar"></i></div>
-                <span style={{ fontSize: '15px', fontWeight: '500', color: 'var(--text-main)' }}>Poll</span>
-              </div>
-
               <div onClick={() => openModal('announcement')} style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer' }}>
                 <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg, #00A884, #25D366)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '18px' }}><i className="fas fa-bullhorn"></i></div>
                 <span style={{ fontSize: '15px', fontWeight: '500', color: 'var(--text-main)' }}>Announcement</span>

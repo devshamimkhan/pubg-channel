@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import CreateChannelModal from './CreateChannelModal';
 
-export default function ChannelSidebar({ channels, onClose }) {
+export default function ChannelSidebar({ channels, onClose, onChannelCreated }) {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
@@ -124,7 +124,12 @@ export default function ChannelSidebar({ channels, onClose }) {
           .sidebar-close-btn-mobile { display: flex !important; }
         }
       `}</style>
-      {showCreateModal && <CreateChannelModal onClose={() => setShowCreateModal(false)} />}
+      {showCreateModal && (
+        <CreateChannelModal
+          onClose={() => setShowCreateModal(false)}
+          onCreated={onChannelCreated}
+        />
+      )}
     </div>
   );
 }

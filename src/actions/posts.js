@@ -14,7 +14,6 @@ const VALID_POST_TYPES = [
   'customer-review',
   'text',
   'media',
-  'poll',
 ];
 
 /**

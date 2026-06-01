@@ -2,16 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  FaCheck,
-  FaKey,
-  FaLock,
-  FaSave,
-  FaShieldAlt,
-  FaSpinner,
-  FaUser,
-} from 'react-icons/fa';
-import { updateAdminCredentials, updateAdminProfile } from '@/actions/settings';
+import toast from 'react-hot-toast';
+import { FaEye, FaEyeSlash, FaLock, FaSpinner, FaUser } from 'react-icons/fa';
+import { updateAdminAccount } from '@/actions/settings';
 import s from '../../admin.module.css';
 
 function Field({ label, children, hint }) {
@@ -28,10 +21,6 @@ function normalizeUser(user) {
   return {
     _id: user?._id || '',
     fullName: user?.fullName || '',
-    displayName: user?.displayName || '',
-    email: user?.email || '',
-    bio: user?.bio || '',
-    avatar: user?.avatar || '',
     whatsappNumber: user?.whatsappNumber || '',
     role: user?.role || 'admin',
   };
@@ -40,106 +29,62 @@ function normalizeUser(user) {
 export default function AccountSettingsClient({ initialUser = null, currentUserId = '' }) {
   const router = useRouter();
   const [user, setUser] = useState(() => normalizeUser(initialUser));
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
-  const [profileSaving, setProfileSaving] = useState(false);
-  const [credentialsSaving, setCredentialsSaving] = useState(false);
-
-  const [profileForm, setProfileForm] = useState(() => ({
+  const [saving, setSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [form, setForm] = useState(() => ({
     fullName: user.fullName,
-    displayName: user.displayName,
-    bio: user.bio,
-    avatar: user.avatar,
+    whatsappNumber: user.whatsappNumber,
+    password: '',
   }));
 
-  const [credentialsForm, setCredentialsForm] = useState({
-    newEmail: user.email,
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  });
-
   const initials = useMemo(() => {
-    const parts = String(profileForm.fullName || 'A').trim().split(/\s+/).filter(Boolean);
+    const parts = String(form.fullName || 'A').trim().split(/\s+/).filter(Boolean);
     return parts.slice(0, 2).map((part) => part[0]).join('').toUpperCase();
-  }, [profileForm.fullName]);
+  }, [form.fullName]);
 
-  const refreshPage = () => {
-    router.refresh();
-  };
-
-  const handleProfileSubmit = async (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    setProfileSaving(true);
-    setError('');
-    setMessage('');
 
-    const result = await updateAdminProfile(currentUserId, profileForm);
+    if (!currentUserId) {
+      toast.error('Unable to update account. Please sign in again.');
+      return;
+    }
+
+    const payload = {
+      fullName: form.fullName.trim(),
+      whatsappNumber: form.whatsappNumber.trim(),
+      password: form.password,
+    };
+
+    if (!payload.fullName || !payload.whatsappNumber || !payload.password) {
+      toast.error('Full name, WhatsApp number, and password are required.');
+      return;
+    }
+
+    setSaving(true);
+
+    const result = await updateAdminAccount(currentUserId, payload);
 
     if (result?.success) {
       const nextUser = normalizeUser(result.user);
       setUser(nextUser);
-      setProfileForm({
+      setForm({
         fullName: nextUser.fullName,
-        displayName: nextUser.displayName,
-        bio: nextUser.bio,
-        avatar: nextUser.avatar,
+        whatsappNumber: nextUser.whatsappNumber,
+        password: '',
       });
-      setMessage(result.message || 'Profile updated successfully');
-      refreshPage();
+      setShowPassword(false);
+      toast.success(result.message || 'Account updated successfully');
+      router.refresh();
     } else {
-      setError(result?.message || 'Failed to update profile');
+      toast.error(result?.message || 'Failed to update account');
     }
 
-    setProfileSaving(false);
-  };
-
-  const handleCredentialsSubmit = async (event) => {
-    event.preventDefault();
-    setCredentialsSaving(true);
-    setError('');
-    setMessage('');
-
-    const result = await updateAdminCredentials(currentUserId, credentialsForm);
-
-    if (result?.success) {
-      const nextUser = normalizeUser(result.user);
-      setUser((prev) => ({
-        ...prev,
-        email: nextUser.email || credentialsForm.newEmail || prev.email,
-      }));
-      setCredentialsForm((prev) => ({
-        ...prev,
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-        newEmail: nextUser.email || prev.newEmail,
-      }));
-      setMessage(result.message || 'Credentials updated successfully');
-      refreshPage();
-    } else {
-      setError(result?.message || 'Failed to update credentials');
-    }
-
-    setCredentialsSaving(false);
+    setSaving(false);
   };
 
   return (
     <div className={s.contentArea}>
-      {error ? (
-        <div className={`${s.alert} ${s.alertInfo}`}>
-          <FaShieldAlt />
-          <div>{error}</div>
-        </div>
-      ) : null}
-
-      {message ? (
-        <div className={`${s.alert} ${s.alertInfo}`}>
-          <FaCheck />
-          <div>{message}</div>
-        </div>
-      ) : null}
-
       <div className={s.card}>
         <div className={s.cardTitle}>
           <FaUser /> Account Settings
@@ -147,96 +92,79 @@ export default function AccountSettingsClient({ initialUser = null, currentUserI
 
         <div className={s.profileHeader}>
           <div className={s.profileAvatarWrap}>
-            <div className={s.profileAvatar}>
-              {profileForm.avatar ? <img src={profileForm.avatar} alt={profileForm.fullName || 'Admin'} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : initials}
-            </div>
+            <div className={s.profileAvatar}>{initials}</div>
           </div>
 
           <div>
-            <div className={s.profileName}>{profileForm.fullName || 'Admin'}</div>
-            <div className={s.profileRole}>{user.role === 'admin' ? 'Administrator' : 'User'} • {user.whatsappNumber || 'No WhatsApp number'}</div>
+            <div className={s.profileName}>{form.fullName || 'Admin'}</div>
+            <div className={s.profileRole}>
+              {user.role === 'admin' ? 'Administrator' : 'User'} • {form.whatsappNumber || 'No WhatsApp number'}
+            </div>
           </div>
         </div>
 
-        <form onSubmit={handleProfileSubmit}>
-          <div className={s.formGrid2}>
-            <Field label="Full Name">
-              <input className={s.formControl} value={profileForm.fullName} onChange={(e) => setProfileForm((prev) => ({ ...prev, fullName: e.target.value }))} required />
-            </Field>
-            <Field label="Display Name">
-              <input className={s.formControl} value={profileForm.displayName} onChange={(e) => setProfileForm((prev) => ({ ...prev, displayName: e.target.value }))} />
-            </Field>
-          </div>
-
-          <Field label="Bio">
-            <textarea className={`${s.formControl} ${s.formControlTextarea}`} value={profileForm.bio} onChange={(e) => setProfileForm((prev) => ({ ...prev, bio: e.target.value }))} />
+        <form onSubmit={handleSubmit} autoComplete="off">
+          <Field label="Full Name">
+            <input
+              className={s.formControl}
+              value={form.fullName}
+              onChange={(e) => setForm((prev) => ({ ...prev, fullName: e.target.value }))}
+              placeholder="Enter full name"
+              required
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="words"
+              spellCheck="false"
+            />
           </Field>
 
-          <Field label="Avatar URL">
-            <input className={s.formControl} value={profileForm.avatar} onChange={(e) => setProfileForm((prev) => ({ ...prev, avatar: e.target.value }))} />
+          <Field label="WhatsApp Number">
+            <input
+              className={s.formControl}
+              type="tel"
+              inputMode="tel"
+              value={form.whatsappNumber}
+              onChange={(e) => setForm((prev) => ({ ...prev, whatsappNumber: e.target.value }))}
+              placeholder="01XXXXXXXXX"
+              required
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck="false"
+            />
+          </Field>
+
+          <Field label="Password" hint="Use your password to save account changes.">
+            <div className={s.pwWrap}>
+              <input
+                className={s.formControl}
+                type={showPassword ? 'text' : 'password'}
+                value={form.password}
+                onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+                placeholder="Enter password"
+                required
+                autoComplete="new-password"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck="false"
+                style={{ paddingRight: '48px' }}
+              />
+              <button
+                type="button"
+                className={s.pwToggleIcon}
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <FaEyeSlash /> : <FaEye />}
+              </button>
+            </div>
           </Field>
 
           <div className={s.cardFooter}>
-            <button type="submit" className={s.btnGold} disabled={profileSaving}>
-              {profileSaving ? <FaSpinner className="animate-spin" /> : <FaSave />}
-              Save Profile
-            </button>
-          </div>
-        </form>
-      </div>
-
-      <div className={s.card}>
-        <div className={s.cardTitle}>
-          <FaKey /> Email & Password
-        </div>
-
-        <form onSubmit={handleCredentialsSubmit}>
-          <div className={s.formGrid2}>
-            <Field label="Email">
-              <input
-                className={s.formControl}
-                type="email"
-                value={credentialsForm.newEmail}
-                onChange={(e) => setCredentialsForm((prev) => ({ ...prev, newEmail: e.target.value }))}
-                placeholder="admin@example.com"
-              />
-            </Field>
-            <Field label="Current Password">
-              <input
-                className={s.formControl}
-                type="password"
-                value={credentialsForm.currentPassword}
-                onChange={(e) => setCredentialsForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
-                placeholder="Required for password changes"
-              />
-            </Field>
-          </div>
-
-          <div className={s.formGrid2}>
-            <Field label="New Password" hint="Leave blank to keep the current password">
-              <input
-                className={s.formControl}
-                type="password"
-                value={credentialsForm.newPassword}
-                onChange={(e) => setCredentialsForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-                placeholder="New password"
-              />
-            </Field>
-            <Field label="Confirm Password">
-              <input
-                className={s.formControl}
-                type="password"
-                value={credentialsForm.confirmPassword}
-                onChange={(e) => setCredentialsForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                placeholder="Confirm new password"
-              />
-            </Field>
-          </div>
-
-          <div className={s.cardFooter}>
-            <button type="submit" className={s.btnGold} disabled={credentialsSaving}>
-              {credentialsSaving ? <FaSpinner className="animate-spin" /> : <FaLock />}
-              Update Email / Password
+            <button type="submit" className={s.btnGold} disabled={saving}>
+              {saving ? <FaSpinner className="animate-spin" /> : <FaLock />}
+              {saving ? 'Saving...' : 'Save Account'}
             </button>
           </div>
         </form>

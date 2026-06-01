@@ -4,7 +4,6 @@ import AnnouncementPost from './templates/AnnouncementPost';
 import FlashSalePost from './templates/FlashSalePost';
 import TextPost from './templates/TextPost';
 import MediaPost from './templates/MediaPost';
-import PollPost from './templates/PollPost';
 import RoyalPassPost from './templates/RoyalPassPost';
 import CustomerReviewPost from './templates/CustomerReviewPost';
 import ReactionBar from './ReactionBar';
@@ -55,7 +54,6 @@ export default function PostCard({ post, isAdmin, currentUserId }) {
         {post.type === 'announcement' && <AnnouncementPost post={post} />}
         {post.type === 'uc-flash-sale' && <FlashSalePost post={post} />}
         {post.type === 'media' && <MediaPost post={post} isAdmin={isAdmin} currentUserId={currentUserId} />}
-        {post.type === 'poll' && <PollPost post={post} />}
         {post.type === 'royal-pass' && <RoyalPassPost post={post} />}
         {post.type === 'customer-review' && <CustomerReviewPost post={post} />}
       </div>

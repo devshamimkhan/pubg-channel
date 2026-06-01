@@ -2,15 +2,16 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 import {
   FaBan,
   FaCheck,
+  FaEye,
+  FaEyeSlash,
   FaPlus,
   FaSearch,
   FaShieldAlt,
   FaSpinner,
-  FaUser,
-  FaUserShield,
   FaUsers,
 } from 'react-icons/fa';
 import { banUser, createAdminAccount, createUserAccount, unbanUser } from '@/actions/settings';
@@ -32,16 +33,19 @@ function initials(name = '') {
   return parts.slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 }
 
+function formatJoinedDate(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toISOString().slice(0, 10);
+}
+
 function normalizeUser(user) {
   return {
     _id: user?._id || '',
     fullName: user?.fullName || '',
-    displayName: user?.displayName || '',
-    email: user?.email || '',
     whatsappNumber: user?.whatsappNumber || '',
     role: user?.role || 'user',
-    avatar: user?.avatar || '',
-    bio: user?.bio || '',
     isBanned: Boolean(user?.isBanned),
     banReason: user?.banReason || '',
     createdAt: user?.createdAt || null,
@@ -52,33 +56,23 @@ function Badge({ variant, children }) {
   return <span className={`${s.badge} ${variant}`}>{children}</span>;
 }
 
+const EMPTY_FORM = {
+  fullName: '',
+  whatsappNumber: '',
+  password: '',
+};
+
 export default function UserManagementClient({ initialUsers = [], currentUserId = '' }) {
   const router = useRouter();
   const [users, setUsers] = useState(() => initialUsers.map(normalizeUser));
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('users');
   const [busyId, setBusyId] = useState('');
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
-
-  const [userForm, setUserForm] = useState({
-    fullName: '',
-    displayName: '',
-    email: '',
-    whatsappNumber: '',
-    password: '',
-    avatar: '',
-    bio: '',
-  });
-
-  const [adminForm, setAdminForm] = useState({
-    fullName: '',
-    displayName: '',
-    email: '',
-    whatsappNumber: '',
-    password: '',
-    avatar: '',
-    bio: '',
+  const [userForm, setUserForm] = useState(EMPTY_FORM);
+  const [adminForm, setAdminForm] = useState(EMPTY_FORM);
+  const [showPassword, setShowPassword] = useState({
+    user: false,
+    admin: false,
   });
 
   const filteredUsers = useMemo(() => {
@@ -86,7 +80,7 @@ export default function UserManagementClient({ initialUsers = [], currentUserId 
     if (!query) return users;
 
     return users.filter((user) =>
-      [user.fullName, user.displayName, user.email, user.whatsappNumber, user.role]
+      [user.fullName, user.whatsappNumber, user.role]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query))
     );
@@ -106,43 +100,32 @@ export default function UserManagementClient({ initialUsers = [], currentUserId 
     setUsers((prev) => [normalizeUser(created), ...prev]);
   };
 
+  const resetForm = (role) => {
+    if (role === 'admin') {
+      setAdminForm(EMPTY_FORM);
+      setShowPassword((prev) => ({ ...prev, admin: false }));
+      return;
+    }
+
+    setUserForm(EMPTY_FORM);
+    setShowPassword((prev) => ({ ...prev, user: false }));
+  };
+
   const handleCreate = async (event, role) => {
     event.preventDefault();
     setBusyId(role === 'admin' ? 'create-admin' : 'create-user');
-    setError('');
-    setMessage('');
 
     const payload = role === 'admin' ? adminForm : userForm;
     const action = role === 'admin' ? createAdminAccount : createUserAccount;
     const result = await action(payload);
 
     if (result?.success) {
-      setMessage(result.message || `${role === 'admin' ? 'Admin' : 'User'} created successfully`);
+      toast.success(result.message || `${role === 'admin' ? 'Admin' : 'User'} created successfully`);
       prependUser(result.user);
-      if (role === 'admin') {
-        setAdminForm({
-          fullName: '',
-          displayName: '',
-          email: '',
-          whatsappNumber: '',
-          password: '',
-          avatar: '',
-          bio: '',
-        });
-      } else {
-        setUserForm({
-          fullName: '',
-          displayName: '',
-          email: '',
-          whatsappNumber: '',
-          password: '',
-          avatar: '',
-          bio: '',
-        });
-      }
+      resetForm(role);
       refreshUsers();
     } else {
-      setError(result?.message || 'Failed to create account');
+      toast.error(result?.message || 'Failed to create account');
     }
 
     setBusyId('');
@@ -150,16 +133,14 @@ export default function UserManagementClient({ initialUsers = [], currentUserId 
 
   const handleBan = async (userId) => {
     setBusyId(userId);
-    setError('');
-    setMessage('');
 
     const result = await banUser(userId);
     if (result?.success) {
-      setMessage(result.message || 'User banned');
+      toast.success(result.message || 'User banned');
       updateUserInList(result.user);
       refreshUsers();
     } else {
-      setError(result?.message || 'Failed to ban user');
+      toast.error(result?.message || 'Failed to ban user');
     }
 
     setBusyId('');
@@ -167,16 +148,14 @@ export default function UserManagementClient({ initialUsers = [], currentUserId 
 
   const handleUnban = async (userId) => {
     setBusyId(userId);
-    setError('');
-    setMessage('');
 
     const result = await unbanUser(userId);
     if (result?.success) {
-      setMessage(result.message || 'User unbanned');
+      toast.success(result.message || 'User unbanned');
       updateUserInList(result.user);
       refreshUsers();
     } else {
-      setError(result?.message || 'Failed to unban user');
+      toast.error(result?.message || 'Failed to unban user');
     }
 
     setBusyId('');
@@ -186,71 +165,55 @@ export default function UserManagementClient({ initialUsers = [], currentUserId 
     const form = role === 'admin' ? adminForm : userForm;
     const setForm = role === 'admin' ? setAdminForm : setUserForm;
     const isBusy = busyId === (role === 'admin' ? 'create-admin' : 'create-user');
+    const passwordVisible = showPassword[role];
 
     return (
-      <form onSubmit={(event) => handleCreate(event, role)}>
-        <div className={s.formGrid2}>
-          <Field label="Full Name">
-            <input
-              className={s.formControl}
-              value={form.fullName}
-              onChange={(e) => setForm((prev) => ({ ...prev, fullName: e.target.value }))}
-              required
-            />
-          </Field>
-          <Field label="Display Name">
-            <input
-              className={s.formControl}
-              value={form.displayName}
-              onChange={(e) => setForm((prev) => ({ ...prev, displayName: e.target.value }))}
-            />
-          </Field>
-        </div>
+      <form autoComplete="off" onSubmit={(event) => handleCreate(event, role)}>
+        <Field label="Full Name">
+          <input
+            className={s.formControl}
+            autoComplete="off"
+            autoCapitalize="words"
+            spellCheck={false}
+            value={form.fullName}
+            onChange={(e) => setForm((prev) => ({ ...prev, fullName: e.target.value }))}
+            required
+          />
+        </Field>
 
-        <div className={s.formGrid2}>
-          <Field label="Email">
-            <input
-              className={s.formControl}
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-            />
-          </Field>
-          <Field label="WhatsApp Number">
-            <input
-              className={s.formControl}
-              value={form.whatsappNumber}
-              onChange={(e) => setForm((prev) => ({ ...prev, whatsappNumber: e.target.value }))}
-              required
-            />
-          </Field>
-        </div>
+        <Field label="WhatsApp Number">
+          <input
+            className={s.formControl}
+            autoComplete="off"
+            inputMode="tel"
+            spellCheck={false}
+            value={form.whatsappNumber}
+            onChange={(e) => setForm((prev) => ({ ...prev, whatsappNumber: e.target.value }))}
+            required
+          />
+        </Field>
 
-        <div className={s.formGrid2}>
-          <Field label="Password">
+        <Field label="Password">
+          <div className={s.pwWrap}>
             <input
               className={s.formControl}
-              type="password"
+              style={{ paddingRight: '52px' }}
+              autoComplete="off"
+              type={passwordVisible ? 'text' : 'password'}
               value={form.password}
               onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
               required
             />
-          </Field>
-          <Field label="Avatar URL">
-            <input
-              className={s.formControl}
-              value={form.avatar}
-              onChange={(e) => setForm((prev) => ({ ...prev, avatar: e.target.value }))}
-            />
-          </Field>
-        </div>
-
-        <Field label="Bio">
-          <textarea
-            className={`${s.formControl} ${s.formControlTextarea}`}
-            value={form.bio}
-            onChange={(e) => setForm((prev) => ({ ...prev, bio: e.target.value }))}
-          />
+            <button
+              type="button"
+              className={s.pwToggleIcon}
+              onClick={() => setShowPassword((prev) => ({ ...prev, [role]: !prev[role] }))}
+              aria-label={passwordVisible ? 'Hide password' : 'Show password'}
+              aria-pressed={passwordVisible}
+            >
+              {passwordVisible ? <FaEyeSlash /> : <FaEye />}
+            </button>
+          </div>
         </Field>
 
         <div className={s.cardFooter}>
@@ -275,7 +238,7 @@ export default function UserManagementClient({ initialUsers = [], currentUserId 
           <thead>
             <tr>
               <th>User</th>
-              <th className={s.colEmail}>Email</th>
+              <th>WhatsApp</th>
               <th>Role</th>
               <th>Status</th>
               <th className={s.colJoined}>Joined</th>
@@ -292,24 +255,15 @@ export default function UserManagementClient({ initialUsers = [], currentUserId 
                   <td>
                     <div className={s.userCell}>
                       <div className={`${s.uAvatar} ${user.role === 'admin' ? s.uAvatarBlue : ''} ${user.isBanned ? s.uAvatarRed : ''}`}>
-                        {user.avatar ? (
-                          <img
-                            src={user.avatar}
-                            alt=""
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
-                          />
-                        ) : (
-                          initials(user.fullName || user.displayName)
-                        )}
+                        {initials(user.fullName)}
                       </div>
                       <div>
                         <div style={{ fontWeight: 600 }}>{user.fullName || 'Unnamed user'}</div>
-                        <div className={s.hint}>{user.whatsappNumber}</div>
                         {isCurrent ? <Badge variant={s.badgeGold}>You</Badge> : null}
                       </div>
                     </div>
                   </td>
-                  <td className={s.colEmail}>{user.email || '-'}</td>
+                  <td>{user.whatsappNumber || '-'}</td>
                   <td>
                     <Badge variant={user.role === 'admin' ? s.badgeBlue : s.badgeGreen}>
                       {user.role === 'admin' ? 'Admin' : 'User'}
@@ -322,7 +276,7 @@ export default function UserManagementClient({ initialUsers = [], currentUserId 
                       <Badge variant={s.badgeGreen}>Active</Badge>
                     )}
                   </td>
-                  <td className={s.colJoined}>{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}</td>
+                  <td className={s.colJoined}>{formatJoinedDate(user.createdAt)}</td>
                   <td>
                     <div className={s.actionBtns}>
                       {user.isBanned ? (
@@ -359,20 +313,6 @@ export default function UserManagementClient({ initialUsers = [], currentUserId 
 
   return (
     <div className={s.contentArea}>
-      {error ? (
-        <div className={`${s.alert} ${s.alertInfo}`}>
-          <FaBan />
-          <div>{error}</div>
-        </div>
-      ) : null}
-
-      {message ? (
-        <div className={`${s.alert} ${s.alertInfo}`}>
-          <FaCheck />
-          <div>{message}</div>
-        </div>
-      ) : null}
-
       <div className={s.card}>
         <div className={s.cardTitle}>
           <FaUsers /> User Management

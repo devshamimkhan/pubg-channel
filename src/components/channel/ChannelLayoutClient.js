@@ -41,6 +41,27 @@ export default function ChannelLayoutClient({ channels, children }) {
   }, [activeChannel, currentUserId]);
 
   useEffect(() => {
+    setChannelsState(channels);
+  }, [channels]);
+
+  const handleChannelCreated = (channel) => {
+    if (!channel?._id) return;
+
+    setChannelsState((prev) => {
+      const nextChannel = {
+        ...channel,
+        followersCount: Number(channel.followersCount ?? 0),
+        onlineCount: Number(channel.onlineCount ?? 0),
+        latestPostPreview: channel.latestPostPreview || '',
+        latestPostAt: channel.latestPostAt || null,
+        unseenCount: Number(channel.unseenCount ?? 0),
+      };
+
+      return [nextChannel, ...prev.filter((item) => item._id !== nextChannel._id)];
+    });
+  };
+
+  useEffect(() => {
     let active = true;
     let timerId;
     let eventSource;
@@ -281,10 +302,11 @@ export default function ChannelLayoutClient({ channels, children }) {
           }}
           className={(sidebarOpen || isChannelListPage) ? 'open' : ''}
         >
-          <ChannelSidebar
-            channels={channelsState}
-            onClose={() => setSidebarOpen(false)}
-          />
+            <ChannelSidebar
+              channels={channelsState}
+              onClose={() => setSidebarOpen(false)}
+              onChannelCreated={handleChannelCreated}
+            />
         </div>
 
         {/* ── CENTER MAIN ── */}

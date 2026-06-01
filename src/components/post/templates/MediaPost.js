@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useTransition } from 'react';
 import { createPortal } from 'react-dom';
 import EmojiPicker from 'emoji-picker-react';
+import toast from 'react-hot-toast';
 import { toggleReaction } from '@/actions/reactions';
 import { deletePost, updatePost } from '@/actions/posts';
 import SafeHtml from '@/components/ui/SafeHtml';
@@ -18,13 +19,6 @@ export default function MediaPost({ post, isAdmin, currentUserId }) {
   // Delete flow
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  // Inline toast
-  const [toast, setToast] = useState(null); // { type: 'success'|'error', msg: string }
-  const showToast = (type, msg) => {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 3500);
-  };
 
   const [isPending, startTransition] = useTransition();
 
@@ -61,9 +55,9 @@ export default function MediaPost({ post, isAdmin, currentUserId }) {
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(blobUrl);
-      showToast('success', 'Download started!');
-    } catch (err) {
-      showToast('error', 'Failed to download. Try again.');
+      toast.success('Download started!');
+    } catch {
+      toast.error('Failed to download. Try again.');
     }
   };
 
@@ -90,14 +84,14 @@ export default function MediaPost({ post, isAdmin, currentUserId }) {
       }
 
       if (!res?.success) throw new Error(res?.message || 'Delete failed');
-      showToast('success', newMediaArray.length === 0
+      toast.success(newMediaArray.length === 0
         ? 'Post deleted successfully'
         : 'Media removed successfully');
-    } catch (error) {
+    } catch {
       // Rollback
       setLocalMedia(snapshot);
       setActiveIndex(activeIndex);
-      showToast('error', 'Failed to delete. Please try again.');
+      toast.error('Failed to delete. Please try again.');
     } finally {
       setIsDeleting(false);
     }
@@ -105,7 +99,7 @@ export default function MediaPost({ post, isAdmin, currentUserId }) {
 
   const handleToggleReaction = (emoji) => {
     if (!currentUserId) {
-      alert('Please log in to react');
+      toast.error('Please log in to react');
       return;
     }
     setShowEmojiPicker(false);
@@ -384,21 +378,6 @@ export default function MediaPost({ post, isAdmin, currentUserId }) {
               </div>
             ))}
           </div>
-          {/* ── Toast Notification ── */}
-          {toast && (
-            <div
-              className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-[6000] flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl text-white text-[14px] font-medium transition-all duration-300 ${
-                toast.type === 'success'
-                  ? 'bg-[#00a884]'
-                  : 'bg-red-500'
-              }`}
-              onClick={e => e.stopPropagation()}
-            >
-              <i className={`fas ${ toast.type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation' } text-[18px]`}></i>
-              <span>{toast.msg}</span>
-            </div>
-          )}
-
           {/* ── Delete Confirmation Modal ── */}
           {showDeleteModal && (
             <div

@@ -1,3 +1,13 @@
+import { createSeoMetadata } from '@/lib/seo-metadata';
+
+export async function generateMetadata() {
+  return createSeoMetadata(null, {
+    pageTitle: 'Channels',
+    pageDescription: 'Select a channel to view the latest posts.',
+    noIndex: true,
+  });
+}
+
 export default function ChannelsPage() {
   return (
     <div

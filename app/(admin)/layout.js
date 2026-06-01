@@ -1,13 +1,12 @@
-// app/admin/layout.js
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import {
   FaShieldAlt,
   FaGlobe,
-  FaSatelliteDish,
   FaUsers,
   FaUserShield,
   FaStore,
@@ -17,44 +16,39 @@ import {
 } from "react-icons/fa";
 import s from "./admin.module.css";
 
-// ── Nav config ───────────────────────────────────────────────
 const NAV_ITEMS = [
   {
     section: "Configuration",
     links: [
-      { href: "/admin/settings", Icon: FaGlobe,         label: "Site Settings"      },
-      { href: "/admin/channels", Icon: FaSatelliteDish, label: "Channel Management" },
+      { href: "/admin/settings", Icon: FaGlobe, label: "Site Settings" },
     ],
   },
   {
     section: "Management",
     links: [
-      { href: "/admin/users",    Icon: FaUsers,         label: "User Management"    },
+      { href: "/admin/users", Icon: FaUsers, label: "User Management" },
     ],
   },
   {
     section: "Personal",
     links: [
-      { href: "/admin/account",  Icon: FaUserShield,    label: "Account Settings"   },
+      { href: "/admin/account", Icon: FaUserShield, label: "Account Settings" },
     ],
   },
 ];
 
 const BOTTOM_NAV = [
-  { href: "/admin/settings", Icon: FaGlobe,         label: "Site"     },
-  { href: "/admin/channels", Icon: FaSatelliteDish, label: "Channels" },
-  { href: "/admin/users",    Icon: FaUsers,         label: "Users"    },
-  { href: "/admin/account",  Icon: FaUserShield,    label: "Account"  },
+  { href: "/admin/settings", Icon: FaGlobe, label: "Site" },
+  { href: "/admin/users", Icon: FaUsers, label: "Users" },
+  { href: "/admin/account", Icon: FaUserShield, label: "Account" },
 ];
 
 const PAGE_TITLES = {
-  "/admin/settings": { title: "Site Settings",      Icon: FaGlobe         },
-  "/admin/channels": { title: "Channel Management", Icon: FaSatelliteDish },
-  "/admin/users":    { title: "User Management",    Icon: FaUsers         },
-  "/admin/account":  { title: "Account Settings",   Icon: FaUserShield    },
+  "/admin/settings": { title: "Site Settings", Icon: FaGlobe },
+  "/admin/users": { title: "User Management", Icon: FaUsers },
+  "/admin/account": { title: "Account Settings", Icon: FaUserShield },
 };
 
-// ── Layout ───────────────────────────────────────────────────
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -64,38 +58,41 @@ export default function AdminLayout({ children }) {
 
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
-  // Close on route change
-  useEffect(() => { closeSidebar(); }, [pathname, closeSidebar]);
+  const handleLogout = useCallback(async () => {
+    await signOut({
+      callbackUrl: "/login",
+      redirect: true,
+    });
+  }, []);
 
-  // Swipe-to-close
+  useEffect(() => {
+    closeSidebar();
+  }, [pathname, closeSidebar]);
+
   useEffect(() => {
     let startX = 0;
-    const onStart = (e) => { startX = e.touches[0].clientX; };
-    const onEnd   = (e) => {
+    const onStart = (e) => {
+      startX = e.touches[0].clientX;
+    };
+    const onEnd = (e) => {
       if (startX - e.changedTouches[0].clientX > 60 && sidebarOpen) closeSidebar();
     };
     document.addEventListener("touchstart", onStart, { passive: true });
-    document.addEventListener("touchend",   onEnd,   { passive: true });
+    document.addEventListener("touchend", onEnd, { passive: true });
     return () => {
       document.removeEventListener("touchstart", onStart);
-      document.removeEventListener("touchend",   onEnd);
+      document.removeEventListener("touchend", onEnd);
     };
   }, [sidebarOpen, closeSidebar]);
 
   return (
     <div className={s.adminRoot}>
-
-      {/* Backdrop */}
       <div
         className={`${s.sidebarBackdrop} ${sidebarOpen ? s.show : ""}`}
         onClick={closeSidebar}
       />
 
-      {/* ════════════════════════
-          SIDEBAR
-      ════════════════════════ */}
       <aside className={`${s.sidebar} ${sidebarOpen ? s.sidebarOpen : ""}`}>
-
         <div className={s.sidebarLogo}>
           <div className={s.adminBadge}>
             <FaShieldAlt style={{ fontSize: 10 }} />
@@ -124,13 +121,14 @@ export default function AdminLayout({ children }) {
           ))}
 
           <div className={s.sidebarFooter}>
-            <Link href="/" className={s.navItem} style={{ textDecoration: "none" }}>
-              <FaStore /> View Store
+            <Link href="/channels" className={s.navItem} style={{ textDecoration: "none" }}>
+              <FaStore /> View Channels
             </Link>
             <button
               type="button"
               className={`${s.navItem} ${s.navDanger}`}
               style={{ width: "100%", background: "none", border: "none" }}
+              onClick={handleLogout}
             >
               <FaSignOutAlt /> Log Out
             </button>
@@ -138,12 +136,7 @@ export default function AdminLayout({ children }) {
         </div>
       </aside>
 
-      {/* ════════════════════════
-          MAIN
-      ════════════════════════ */}
       <main className={s.main}>
-
-        {/* Top Bar */}
         <div className={s.topBar}>
           <div className={s.topBarLeft}>
             <button
@@ -169,9 +162,6 @@ export default function AdminLayout({ children }) {
         {children}
       </main>
 
-      {/* ════════════════════════
-          BOTTOM NAV (mobile)
-      ════════════════════════ */}
       <nav className={s.bottomNav}>
         <div className={s.bottomNavInner}>
           {BOTTOM_NAV.map(({ href, Icon, label }) => (
@@ -188,7 +178,6 @@ export default function AdminLayout({ children }) {
           ))}
         </div>
       </nav>
-
     </div>
   );
 }

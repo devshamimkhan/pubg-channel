@@ -206,6 +206,8 @@ body {
   background: linear-gradient(135deg, var(--gold-light), var(--gold), var(--gold-dim));
   color: #000;
   box-shadow: 0 2px 12px rgba(212,175,55,.35);
+  padding: 10px 0;
+  cursor: pointer;
 }
 .btn-gold:hover {
   box-shadow: 0 4px 20px rgba(212,175,55,.5);
@@ -215,6 +217,8 @@ body {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-main);
+  padding: 8px 16px;
+  cursor: pointer;
 }
 .btn-outline:hover {
   border-color: var(--gold-dim);

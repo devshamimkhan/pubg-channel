@@ -1,28 +1,13 @@
 import mongoose from 'mongoose';
 
-const SocialLinksSchema = new mongoose.Schema(
+const SocialLinkSchema = new mongoose.Schema(
   {
-    whatsapp: {
+    platform: {
       type: String,
-      default: '',
+      enum: ['facebook', 'youtube', 'whatsapp', 'telegram', 'twitter', 'instagram'],
+      default: 'facebook',
     },
-    youtube: {
-      type: String,
-      default: '',
-    },
-    facebook: {
-      type: String,
-      default: '',
-    },
-    telegram: {
-      type: String,
-      default: '',
-    },
-    twitter: {
-      type: String,
-      default: '',
-    },
-    instagram: {
+    url: {
       type: String,
       default: '',
     },
@@ -80,8 +65,8 @@ const SiteSettingsSchema = new mongoose.Schema(
       default: '',
     },
     socialLinks: {
-      type: SocialLinksSchema,
-      default: () => ({}),
+      type: [SocialLinkSchema],
+      default: [],
     },
     homepageContent: {
       bio: {

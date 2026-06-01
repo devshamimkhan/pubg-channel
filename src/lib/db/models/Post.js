@@ -13,7 +13,7 @@ const PostSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['announcement', 'uc-flash-sale', 'royal-pass', 'customer-review', 'text', 'media', 'poll'],
+    enum: ['announcement', 'uc-flash-sale', 'royal-pass', 'customer-review', 'text', 'media'],
     required: true,
   },
   title: String,

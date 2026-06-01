@@ -3,6 +3,9 @@ import Channel from '@/lib/db/models/Channel';
 import User from '@/lib/db/models/User';
 import ChannelLayoutClient from '@/components/channel/ChannelLayoutClient';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function DashboardLayout({ children }) {
   await connectDB();
   

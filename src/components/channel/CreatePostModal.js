@@ -36,10 +36,6 @@ export default function CreatePostModal({ type: initialType, channelId, onClose 
   const [ctaButtonText, setCtaButtonText] = useState('');
   const [whatsappLink, setWhatsappLink] = useState('');
 
-  // Poll specific state
-  const [pollOptions, setPollOptions] = useState([{ text: '' }, { text: '' }]);
-  const [pollDuration, setPollDuration] = useState('24h');
-
   // UC Flash Sale specific
   const [ucPacks, setUcPacks] = useState([
     { amount: '60', price: '45', oldPrice: '55', isPopular: false },
@@ -150,15 +146,7 @@ export default function CreatePostModal({ type: initialType, channelId, onClose 
       let templateData = {};
       let postType = activeTab;
 
-      if (activeTab === 'poll') {
-        const validOptions = pollOptions.filter(o => o.text.trim() !== '');
-        if (validOptions.length < 2) throw new Error('Poll needs at least 2 options');
-        templateData = {
-          options: validOptions.map(o => ({ text: o.text.trim(), votes: 0 })),
-          duration: pollDuration,
-          endTime: new Date(Date.now() + (pollDuration === '24h' ? 86400000 : 86400000 * 7)).toISOString()
-        };
-      } else if (activeTab === 'announcement') {
+      if (activeTab === 'announcement') {
         const validSteps = steps.filter(s => s.title.trim() !== '');
         templateData = {
           steps: validSteps.map(s => ({
@@ -288,39 +276,6 @@ export default function CreatePostModal({ type: initialType, channelId, onClose 
 
 
 
-  const renderPollForm = () => (
-    <>
-      <div style={{ marginBottom: '16px' }}>
-        <label className="form-label">Question</label>
-        <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Ask a question..." className="form-input" required />
-      </div>
-      <div style={{ marginBottom: '16px' }}>
-        <label className="form-label">Options</label>
-        {pollOptions.map((opt, i) => (
-          <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-            <input
-              type="text" value={opt.text} placeholder={`Option ${i + 1}`} className="form-input"
-              onChange={(e) => {
-                const newOpts = [...pollOptions];
-                newOpts[i].text = e.target.value;
-                setPollOptions(newOpts);
-              }}
-            />
-            {i >= 2 && (
-              <button type="button" onClick={() => setPollOptions(pollOptions.filter((_, idx) => idx !== i))} style={{ background: 'none', border: 'none', color: 'var(--accent-red)', cursor: 'pointer' }}>
-                <i className="fas fa-times"></i>
-              </button>
-            )}
-          </div>
-        ))}
-        {pollOptions.length < 5 && (
-          <button type="button" onClick={() => setPollOptions([...pollOptions, { text: '' }])} className="btn-outline" style={{ width: '100%', marginTop: '8px', padding: '8px' }}>
-            + Add Option
-          </button>
-        )}
-      </div>
-    </>
-  );
 
   const renderAnnouncementForm = () => (
     <>
@@ -1027,7 +982,6 @@ export default function CreatePostModal({ type: initialType, channelId, onClose 
             <style>{`.form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; }`}</style>
 
             {activeTab === 'media' && renderMediaForm()}
-            {activeTab === 'poll' && renderPollForm()}
             {activeTab === 'announcement' && renderAnnouncementForm()}
 
             {activeTab === 'uc-flash-sale' && renderFlashSaleForm()}

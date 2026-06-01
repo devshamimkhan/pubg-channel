@@ -5,7 +5,7 @@ import { createChannel } from '@/actions/channels';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
-export default function CreateChannelModal({ onClose }) {
+export default function CreateChannelModal({ onClose, onCreated }) {
   const { data: session } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -37,6 +37,7 @@ export default function CreateChannelModal({ onClose }) {
     });
 
     if (result.success) {
+      onCreated?.(result.channel);
       router.refresh();
       onClose();
     } else {

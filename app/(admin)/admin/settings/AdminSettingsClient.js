@@ -2,33 +2,74 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 import {
-  FaBullhorn,
   FaCheck,
+  FaEdit,
+  FaFacebookF,
   FaGlobe,
   FaImage,
+  FaInstagram,
   FaLink,
   FaPlus,
   FaSave,
   FaSearch,
+  FaTelegramPlane,
+  FaTimes,
   FaTrash,
+  FaTwitter,
   FaUpload,
+  FaWhatsapp,
+  FaYoutube,
 } from 'react-icons/fa';
-import { createSiteSettings, updateSiteSettings } from '@/actions/settings';
+import { createSiteSettings, updateSiteSettings, updateSocialLinks } from '@/actions/settings';
+import { publishFaviconHref } from '@/components/layouts/FaviconSync';
 import { uploadSingleMediaFile } from '@/lib/media/upload';
 import s from '../../admin.module.css';
 
-const SOCIAL_FIELDS = [
-  { key: 'whatsapp', label: 'WhatsApp', placeholder: 'https://wa.me/...' },
-  { key: 'youtube', label: 'YouTube', placeholder: 'https://youtube.com/@...' },
-  { key: 'facebook', label: 'Facebook', placeholder: 'https://facebook.com/...' },
-  { key: 'telegram', label: 'Telegram', placeholder: 'https://t.me/...' },
-  { key: 'twitter', label: 'Twitter / X', placeholder: 'https://x.com/...' },
-  { key: 'instagram', label: 'Instagram', placeholder: 'https://instagram.com/...' },
+const SOCIAL_ICON_OPTIONS = [
+  { value: 'facebook', label: 'Facebook', icon: FaFacebookF, className: s.socialFb },
+  { value: 'youtube', label: 'YouTube', icon: FaYoutube, className: s.socialYt },
+  { value: 'whatsapp', label: 'WhatsApp', icon: FaWhatsapp, className: s.socialWa },
+  { value: 'telegram', label: 'Telegram', icon: FaTelegramPlane, className: s.socialTg },
+  { value: 'twitter', label: 'Twitter / X', icon: FaTwitter, className: s.socialTw },
+  { value: 'instagram', label: 'Instagram', icon: FaInstagram, className: s.socialIg },
 ];
+
+const SOCIAL_ICON_MAP = new Map(SOCIAL_ICON_OPTIONS.map((option) => [option.value, option]));
 
 function emptyLink() {
   return { title: '', url: '', image: '', type: 'card' };
+}
+
+function createSocialLinkId(platform = 'link') {
+  return `${platform}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+}
+
+function normalizeSocialPlatform(platform = '') {
+  return SOCIAL_ICON_MAP.has(platform) ? platform : 'facebook';
+}
+
+function normalizeSocialLinks(socialLinks = []) {
+  if (Array.isArray(socialLinks)) {
+    return socialLinks
+      .map((link, index) => ({
+        id: String(link?.id || link?._id || createSocialLinkId(link?.platform || `link-${index}`)),
+        platform: normalizeSocialPlatform(link?.platform || link?.icon),
+        url: String(link?.url || '').trim(),
+      }))
+      .filter((link) => link.url);
+  }
+
+  if (socialLinks && typeof socialLinks === 'object') {
+    return SOCIAL_ICON_OPTIONS.map((option) => ({
+      id: createSocialLinkId(option.value),
+      platform: option.value,
+      url: String(socialLinks?.[option.value] || '').trim(),
+    })).filter((link) => link.url);
+  }
+
+  return [];
 }
 
 function normalizeSettings(settings) {
@@ -39,14 +80,7 @@ function normalizeSettings(settings) {
     favicon: settings?.favicon || '',
     contactEmail: settings?.contactEmail || '',
     whatsappNumber: settings?.whatsappNumber || '',
-    socialLinks: {
-      whatsapp: settings?.socialLinks?.whatsapp || '',
-      youtube: settings?.socialLinks?.youtube || '',
-      facebook: settings?.socialLinks?.facebook || '',
-      telegram: settings?.socialLinks?.telegram || '',
-      twitter: settings?.socialLinks?.twitter || '',
-      instagram: settings?.socialLinks?.instagram || '',
-    },
+    socialLinks: normalizeSocialLinks(settings?.socialLinks),
     homepageContent: {
       bio: settings?.homepageContent?.bio || '',
       links: Array.isArray(settings?.homepageContent?.links) && settings.homepageContent.links.length
@@ -91,13 +125,20 @@ export default function AdminSettingsClient({ initialSettings, initialError, ini
   const [mode, setMode] = useState(initialMode);
   const [settingsId, setSettingsId] = useState(initialSettings?._id || '');
   const [error, setError] = useState(initialError || '');
-  const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const [syncingSocialLinks, setSyncingSocialLinks] = useState(false);
   const [uploading, setUploading] = useState('');
   const [uploadingLinkIndex, setUploadingLinkIndex] = useState(-1);
 
   const [search, setSearch] = useState('');
   const [form, setForm] = useState(() => normalizeSettings(initialSettings));
+
+  const [socialDraft, setSocialDraft] = useState(() => ({
+    id: '',
+    platform: 'facebook',
+    url: '',
+  }));
+  const [editingSocialLinkId, setEditingSocialLinkId] = useState('');
 
   const featuredChannelSet = useMemo(() => new Set(form.featuredChannels), [form.featuredChannels]);
 
@@ -117,10 +158,6 @@ export default function AdminSettingsClient({ initialSettings, initialError, ini
     setForm((prev) => {
       if (path.length === 1) {
         return { ...prev, [path[0]]: value };
-      }
-
-      if (path[0] === 'socialLinks') {
-        return { ...prev, socialLinks: { ...prev.socialLinks, [path[1]]: value } };
       }
 
       if (path[0] === 'seo') {
@@ -180,15 +217,21 @@ export default function AdminSettingsClient({ initialSettings, initialError, ini
 
       setForm((prev) => {
         if (!nestedKey) {
+          if (targetKey === 'favicon') {
+            publishFaviconHref(uploaded.url);
+          }
+
           return { ...prev, [targetKey]: uploaded.url };
         }
 
+        const nextValue = {
+          ...prev[targetKey],
+          [nestedKey]: uploaded.url,
+        };
+
         return {
           ...prev,
-          [targetKey]: {
-            ...prev[targetKey],
-            [nestedKey]: uploaded.url,
-          },
+          [targetKey]: nextValue,
         };
       });
     } catch (err) {
@@ -215,14 +258,105 @@ export default function AdminSettingsClient({ initialSettings, initialError, ini
     }
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  const prepareAddSocialLink = () => {
+    setEditingSocialLinkId('');
+    setSocialDraft({
+      id: '',
+      platform: 'facebook',
+      url: '',
+    });
+  };
+
+  const prepareEditSocialLink = (link) => {
+    setEditingSocialLinkId(link.id);
+    setSocialDraft({
+      id: link.id,
+      platform: normalizeSocialPlatform(link.platform),
+      url: link.url || '',
+    });
+  };
+
+  const persistSocialLinks = async (nextSocialLinks, successMessage, previousSocialLinks = form.socialLinks) => {
+    setSyncingSocialLinks(true);
+    setError('');
+    setForm((prev) => ({ ...prev, socialLinks: nextSocialLinks }));
+
+    try {
+      const result = await updateSocialLinks(settingsId || initialSettings?._id || '', nextSocialLinks);
+
+      if (!result?.success) {
+        setForm((prev) => ({ ...prev, socialLinks: previousSocialLinks }));
+        toast.error(result?.message || 'Failed to save social links');
+        return false;
+      }
+
+      if (result.settings) {
+        setSettingsId(result.settings._id || settingsId);
+        setForm(normalizeSettings(result.settings));
+      }
+
+      toast.success(successMessage);
+      router.refresh();
+      return true;
+    } catch (err) {
+      setForm((prev) => ({ ...prev, socialLinks: previousSocialLinks }));
+      toast.error(err?.message || 'Failed to save social links');
+      return false;
+    } finally {
+      setSyncingSocialLinks(false);
+    }
+  };
+
+  const commitSocialLink = async () => {
+    const platform = normalizeSocialPlatform(socialDraft.platform);
+    const url = socialDraft.url.trim();
+
+    if (!url) {
+      toast.error('Social link URL is required');
+      return;
+    }
+
+    const nextLink = {
+      id: socialDraft.id || createSocialLinkId(platform),
+      platform,
+      url,
+    };
+
+    const nextSocialLinks = editingSocialLinkId
+      ? form.socialLinks.map((link) => (link.id === editingSocialLinkId || link.id === nextLink.id ? nextLink : link))
+      : [...form.socialLinks, nextLink];
+
+    const saved = await persistSocialLinks(
+      nextSocialLinks,
+      editingSocialLinkId ? 'Social link updated' : 'Social link added',
+      form.socialLinks
+    );
+
+    if (!saved) return;
+
+    setEditingSocialLinkId('');
+    setSocialDraft({ id: '', platform: 'facebook', url: '' });
+  };
+
+  const deleteSocialLink = async (id) => {
+    const nextSocialLinks = form.socialLinks.filter((link) => link.id !== id);
+    const saved = await persistSocialLinks(nextSocialLinks, 'Social link deleted', form.socialLinks);
+
+    if (!saved) return;
+
+    if (editingSocialLinkId === id) {
+      setEditingSocialLinkId('');
+      setSocialDraft({ id: '', platform: 'facebook', url: '' });
+    }
+  };
+
+  const saveSettings = async () => {
     setSaving(true);
     setError('');
-    setMessage('');
 
     const payload = {
       ...form,
+      socialLinks: form.socialLinks.filter((link) => link.url.trim()),
       homepageContent: {
         ...form.homepageContent,
         links: form.homepageContent.links.filter((link) => link.title || link.url || link.image),
@@ -235,13 +369,18 @@ export default function AdminSettingsClient({ initialSettings, initialError, ini
         : await updateSiteSettings(settingsId, payload);
 
     if (result?.success) {
-      setMessage(result.message || 'Settings saved successfully');
+      toast.success(result.message || 'Settings saved successfully');
       setMode('edit');
       if (result.settings?._id) setSettingsId(result.settings._id);
-      if (result.settings) setForm(normalizeSettings(result.settings));
+      if (result.settings) {
+        setForm(normalizeSettings(result.settings));
+        publishFaviconHref(result.settings.favicon || form.favicon || '');
+      } else if (payload.favicon) {
+        publishFaviconHref(payload.favicon);
+      }
       router.refresh();
     } else {
-      setError(result?.message || 'Failed to save settings');
+      toast.error(result?.message || 'Failed to save settings');
     }
 
     setSaving(false);
@@ -251,21 +390,14 @@ export default function AdminSettingsClient({ initialSettings, initialError, ini
 
   return (
     <div className={s.contentArea}>
-      {error ? (
-        <div className={`${s.alert} ${s.alertInfo}`}>
-          <FaBullhorn />
-          <div>{error}</div>
-        </div>
-      ) : null}
+      <form onSubmit={(e) => { e.preventDefault(); saveSettings(); }}>
+        {error ? (
+          <div className={`${s.alert} ${s.alertInfo}`} style={{ marginBottom: 18 }}>
+            <FaTimes />
+            <div>{error}</div>
+          </div>
+        ) : null}
 
-      {message ? (
-        <div className={`${s.alert} ${s.alertInfo}`}>
-          <FaCheck />
-          <div>{message}</div>
-        </div>
-      ) : null}
-
-      <form onSubmit={handleSubmit}>
         <div className={s.card}>
           <div className={s.cardTitle}>
             <FaGlobe /> Site Settings
@@ -347,26 +479,163 @@ export default function AdminSettingsClient({ initialSettings, initialError, ini
               <input ref={faviconInputRef} type="file" accept="image/*,.ico,.svg" hidden onChange={(e) => handleUpload(e.target.files?.[0], 'favicon')} />
             </Field>
           </div>
+
+          <div className={s.cardFooter}>
+            <button type="button" className={s.btnGold} onClick={saveSettings} disabled={isBusy}>
+              <FaSave /> {saving ? 'Saving...' : 'Save Settings'}
+            </button>
+          </div>
         </div>
 
         <div className={s.card}>
-          <div className={s.cardTitle}>
-            <FaLink /> Social Links
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 0, flex: '1 1 240px' }}>
+              <div className={`${s.cardTitle} ${s.cardTitleInline}`} style={{ marginBottom: 6 }}>
+                <FaLink /> Social Links
+              </div>
+              <div className={s.hint}>Manage social profiles with a simple add, edit, and delete workflow.</div>
+            </div>
+
+            <button type="button" className={s.btnOutline} onClick={prepareAddSocialLink} disabled={syncingSocialLinks}>
+              <FaPlus /> Add Social Link
+            </button>
           </div>
 
-          {SOCIAL_FIELDS.map((field) => (
-            <div key={field.key} className={s.socialRow}>
-              <div className={`${s.socialIcon} ${field.key === 'facebook' ? s.socialFb : field.key === 'youtube' ? s.socialYt : field.key === 'telegram' ? s.socialTg : field.key === 'twitter' ? s.socialTw : s.socialIg}`}>
-                <FaLink />
-              </div>
-              <input
-                className={s.formControl}
-                value={form.socialLinks[field.key]}
-                onChange={(e) => updateField(['socialLinks', field.key], e.target.value)}
-                placeholder={field.placeholder}
-              />
+          <div style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--bg-card2)', padding: 16, marginBottom: 18 }}>
+            <div className={s.formGrid2} style={{ gap: 14 }}>
+              <Field label="Social Link URL/Input Field">
+                <input
+                  className={s.formControl}
+                  value={socialDraft.url}
+                  onChange={(e) => setSocialDraft((prev) => ({ ...prev, url: e.target.value }))}
+                  placeholder="https://facebook.com/..."
+                />
+              </Field>
+
+              <Field label="Social Icon Selector Dropdown">
+                <select
+                  className={`${s.formControl} ${s.formControlSelect}`}
+                  value={socialDraft.platform}
+                  onChange={(e) => setSocialDraft((prev) => ({ ...prev, platform: e.target.value }))}
+                >
+                  {SOCIAL_ICON_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
             </div>
-          ))}
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                <div className={`${s.socialIcon} ${(SOCIAL_ICON_MAP.get(normalizeSocialPlatform(socialDraft.platform)) || {}).className || ''}`}>
+                  {(() => {
+                    const Selected = SOCIAL_ICON_MAP.get(normalizeSocialPlatform(socialDraft.platform))?.icon || FaGlobe;
+                    return <Selected />;
+                  })()}
+                </div>
+
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-sub)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+                    {editingSocialLinkId ? 'Editing social link' : 'New social link'}
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-main)', marginTop: 2 }}>
+                    {SOCIAL_ICON_MAP.get(normalizeSocialPlatform(socialDraft.platform))?.label || 'Facebook'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {editingSocialLinkId ? (
+                  <button
+                    type="button"
+                    className={s.btnOutline}
+                    onClick={() => {
+                      setEditingSocialLinkId('');
+                      setSocialDraft({ id: '', platform: 'facebook', url: '' });
+                    }}
+                  >
+                    <FaTimes /> Cancel
+                  </button>
+                ) : null}
+
+                <button type="button" className={s.btnGold} onClick={commitSocialLink} disabled={syncingSocialLinks}>
+                  <FaCheck /> {syncingSocialLinks ? 'Saving...' : editingSocialLinkId ? 'Update' : 'Add'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className={s.tableWrap}>
+            <table className={s.dataTable}>
+              <thead>
+                <tr>
+                  <th style={{ width: 76 }}>Icon</th>
+                  <th>Social Link</th>
+                  <th style={{ width: 132 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {form.socialLinks.length ? (
+                  form.socialLinks.map((link) => {
+                    const option = SOCIAL_ICON_MAP.get(link.platform) || SOCIAL_ICON_MAP.get('facebook');
+                    const Icon = option?.icon || FaGlobe;
+                    const isActive = editingSocialLinkId === link.id;
+
+                    return (
+                      <tr key={link.id} style={isActive ? { background: 'rgba(250, 186, 37, 0.06)' } : undefined}>
+                        <td style={{ width: 76 }}>
+                          <div className={`${s.socialIcon} ${option?.className || ''}`}>
+                            <Icon />
+                          </div>
+                        </td>
+                        <td style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-main)', marginBottom: 4 }}>
+                            {option?.label || 'Social link'}
+                          </div>
+                          <div style={{ fontSize: 13, color: 'var(--text-muted)', wordBreak: 'break-word' }}>{link.url}</div>
+                        </td>
+                        <td style={{ width: 132 }}>
+                          <div className={s.actionBtns}>
+                              <button
+                              type="button"
+                              className={s.iconBtn}
+                              onClick={() => prepareEditSocialLink(link)}
+                              aria-label={`Edit ${option?.label || 'social link'}`}
+                              title="Edit social link"
+                              disabled={syncingSocialLinks}
+                            >
+                              <FaEdit />
+                            </button>
+                            <button
+                              type="button"
+                              className={`${s.iconBtn} ${s.iconBtnDel}`}
+                              onClick={() => deleteSocialLink(link.id)}
+                              aria-label={`Delete ${option?.label || 'social link'}`}
+                              title="Delete social link"
+                              disabled={syncingSocialLinks}
+                            >
+                              <FaTrash />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={3}>
+                      <div style={{ padding: '20px 14px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                        No social links added yet. Use Add Social Link to create the first item.
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
         </div>
 
         <div className={s.card}>
@@ -406,6 +675,12 @@ export default function AdminSettingsClient({ initialSettings, initialError, ini
             <div className={s.seoSite}>{form.siteName || 'Site name'}</div>
             <div className={s.seoTitle}>{form.seo.metaTitle || form.siteName || 'Homepage title'}</div>
             <div className={s.seoDesc}>{form.seo.metaDescription || form.siteDescription || 'Search preview description'}</div>
+          </div>
+
+          <div className={s.cardFooter}>
+            <button type="button" className={s.btnGold} onClick={saveSettings} disabled={isBusy}>
+              <FaSave /> {saving ? 'Saving...' : 'Save Settings'}
+            </button>
           </div>
         </div>
 
@@ -581,6 +856,10 @@ export default function AdminSettingsClient({ initialSettings, initialError, ini
             <button type="button" className={s.btnOutline} onClick={addLink}>
               <FaPlus /> Add link post
             </button>
+
+            <button type="button" className={s.btnGold} onClick={saveSettings} disabled={isBusy}>
+              <FaSave /> {saving ? 'Saving...' : 'Save Settings'}
+            </button>
           </div>
         </div>
 
@@ -623,12 +902,12 @@ export default function AdminSettingsClient({ initialSettings, initialError, ini
           }) : (
             <div className={s.hint}>No channels match your search.</div>
           )}
-        </div>
 
-        <div className={s.cardFooter}>
-          <button type="submit" className={s.btnGold} disabled={isBusy}>
-            <FaSave /> {saving ? 'Saving...' : mode === 'create' ? 'Create Settings' : 'Save Settings'}
-          </button>
+          <div className={s.cardFooter}>
+            <button type="button" className={s.btnGold} onClick={saveSettings} disabled={isBusy}>
+              <FaSave /> {saving ? 'Saving...' : 'Save Settings'}
+            </button>
+          </div>
         </div>
       </form>
     </div>

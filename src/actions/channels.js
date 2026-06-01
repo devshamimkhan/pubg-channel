@@ -45,6 +45,36 @@ function normalizeChannelPayload(data = {}) {
   };
 }
 
+function getFieldValue(data, key) {
+  if (!data) return undefined;
+  if (typeof data.get === 'function') return data.has(key) ? data.get(key) : undefined;
+  return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : undefined;
+}
+
+function normalizeOptionalString(value) {
+  if (value === undefined || value === null) return undefined;
+  return String(value).trim();
+}
+
+function normalizeOptionalBoolean(value) {
+  if (value === undefined || value === null || value === '') return undefined;
+  return normalizeBoolean(value);
+}
+
+function normalizeChannelUpdatePayload(data = {}) {
+  return {
+    name: normalizeOptionalString(getFieldValue(data, 'name')),
+    description: normalizeOptionalString(getFieldValue(data, 'description')),
+    avatar: normalizeOptionalString(getFieldValue(data, 'avatar')),
+    coverImage: normalizeOptionalString(getFieldValue(data, 'coverImage')),
+    tickerText: normalizeOptionalString(getFieldValue(data, 'tickerText')),
+    tickerEnabled: normalizeOptionalBoolean(getFieldValue(data, 'tickerEnabled')),
+    isVerified: normalizeOptionalBoolean(getFieldValue(data, 'isVerified')),
+    isPinned: normalizeOptionalBoolean(getFieldValue(data, 'isPinned')),
+    isReviewEnabled: normalizeOptionalBoolean(getFieldValue(data, 'isReviewEnabled')),
+  };
+}
+
 function getPostPreviewText(post) {
   const stripHtml = (text = '') => text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
   const shorten = (text = '', max = 60) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
@@ -54,7 +84,6 @@ function getPostPreviewText(post) {
   if (post.type === 'uc-flash-sale') return `🔥 ${shorten(cleanTitle || 'Flash Sale')}`;
   if (post.type === 'royal-pass') return `👑 ${shorten(cleanTitle || 'Royal Pass')}`;
   if (post.type === 'announcement') return `📢 ${shorten(cleanTitle || 'Announcement')}`;
-  if (post.type === 'poll') return `📊 ${shorten(cleanTitle || 'New poll')}`;
   if (post.type === 'media') return cleanContent ? `📷 ${shorten(cleanContent)}` : '📷 Media post';
   if (cleanTitle) return shorten(cleanTitle);
   if (cleanContent) return shorten(cleanContent);
@@ -171,27 +200,30 @@ export async function updateChannel(channelId, data) {
       return { success: false, message: 'Channel not found', channel: null };
     }
 
-    const payload = normalizeChannelPayload(data);
+    const payload = normalizeChannelUpdatePayload(data);
 
-    if (!payload.name) {
-      return { success: false, message: 'Channel name is required', channel: null };
+    if (payload.name !== undefined) {
+      if (!payload.name) {
+        return { success: false, message: 'Channel name is required', channel: null };
+      }
+
+      const nextSlug = payload.name !== existingChannel.name ? generateSlug(payload.name) : existingChannel.slug;
+      if (nextSlug !== existingChannel.slug) {
+        const slugExists = await Channel.findOne({ slug: nextSlug, _id: { $ne: channelId } });
+        existingChannel.slug = slugExists ? `${nextSlug}-${Date.now()}` : nextSlug;
+      }
+
+      existingChannel.name = payload.name;
     }
 
-    const nextSlug = payload.name !== existingChannel.name ? generateSlug(payload.name) : existingChannel.slug;
-    if (nextSlug !== existingChannel.slug) {
-      const slugExists = await Channel.findOne({ slug: nextSlug, _id: { $ne: channelId } });
-      existingChannel.slug = slugExists ? `${nextSlug}-${Date.now()}` : nextSlug;
-    }
-
-    existingChannel.name = payload.name;
-    existingChannel.description = payload.description;
-    existingChannel.avatar = payload.avatar;
-    existingChannel.coverImage = payload.coverImage;
-    existingChannel.tickerText = payload.tickerText;
-    existingChannel.tickerEnabled = payload.tickerEnabled;
-    existingChannel.isVerified = payload.isVerified;
-    existingChannel.isPinned = payload.isPinned;
-    existingChannel.isReviewEnabled = payload.isReviewEnabled;
+    if (payload.description !== undefined) existingChannel.description = payload.description;
+    if (payload.avatar !== undefined) existingChannel.avatar = payload.avatar;
+    if (payload.coverImage !== undefined) existingChannel.coverImage = payload.coverImage;
+    if (payload.tickerText !== undefined) existingChannel.tickerText = payload.tickerText;
+    if (payload.tickerEnabled !== undefined) existingChannel.tickerEnabled = payload.tickerEnabled;
+    if (payload.isVerified !== undefined) existingChannel.isVerified = payload.isVerified;
+    if (payload.isPinned !== undefined) existingChannel.isPinned = payload.isPinned;
+    if (payload.isReviewEnabled !== undefined) existingChannel.isReviewEnabled = payload.isReviewEnabled;
 
     await existingChannel.save();
 

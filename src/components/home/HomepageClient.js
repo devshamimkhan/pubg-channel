@@ -111,8 +111,17 @@ export default function HomepageClient({ settings }) {
   const siteName = settings?.siteName || 'PUBG UC Store BD';
   const logo = settings?.logo || '';
   const siteDescription = settings?.siteDescription || '';
-  const socialLinks = settings?.socialLinks || {};
   const homepageBio = settings?.homepageContent?.bio || '';
+
+  const socialLinks = Array.isArray(settings?.socialLinks)
+    ? settings.socialLinks
+    : settings?.socialLinks && typeof settings.socialLinks === 'object'
+      ? Object.entries(settings.socialLinks).map(([platform, url], index) => ({
+          id: `${platform}-${index}`,
+          platform,
+          url,
+        }))
+      : [];
 
   const homepageLinks = Array.isArray(settings?.homepageContent?.links)
     ? settings.homepageContent.links.filter((link) => link?.title || link?.url || link?.image)
@@ -137,10 +146,18 @@ export default function HomepageClient({ settings }) {
     }
   };
 
+  const socialMeta = {
+    facebook: { title: 'Facebook', iconClass: 'fab fa-facebook-f', color: '#1877F2' },
+    youtube: { title: 'YouTube', iconClass: 'fab fa-youtube', color: '#FF0000' },
+    whatsapp: { title: 'WhatsApp', iconClass: 'fab fa-whatsapp', color: '#25D366' },
+    telegram: { title: 'Telegram', iconClass: 'fab fa-telegram-plane', color: '#2AABEE' },
+    twitter: { title: 'Twitter / X', iconClass: 'fab fa-twitter', color: '#1DA1F2' },
+    instagram: { title: 'Instagram', iconClass: 'fab fa-instagram', color: '#E1306C' },
+  };
+
   return (
     <div className="home-wrapper">
       <div className="home-card">
-        {/* Top Nav */}
         <div className="top-nav">
           <div className="logo" title={siteName}>
             <SiteLogo logo={logo} siteName={siteName} />
@@ -150,7 +167,6 @@ export default function HomepageClient({ settings }) {
           </button>
         </div>
 
-        {/* Profile */}
         <div className="profile">
           <div className="avatar-wrap">
             <div className="avatar-ring"></div>
@@ -171,21 +187,31 @@ export default function HomepageClient({ settings }) {
           ) : null}
 
           <div className="socials">
-            <SocialButton href={socialLinks.whatsapp} title="WhatsApp" iconClass="fab fa-whatsapp" color="#25D366" />
-            <SocialButton href={socialLinks.youtube} title="YouTube" iconClass="fab fa-youtube" color="#FF0000" />
-            <SocialButton href={socialLinks.facebook} title="Facebook" iconClass="fab fa-facebook-f" color="#1877F2" />
-            <SocialButton href={socialLinks.telegram} title="Telegram" iconClass="fab fa-telegram-plane" color="#2AABEE" />
+            {socialLinks.map((link, index) => {
+              const platform = String(link?.platform || '').toLowerCase();
+              const meta = socialMeta[platform];
+              const href = String(link?.url || '').trim();
+              if (!meta || !href) return null;
+
+              return (
+                <SocialButton
+                  key={link?.id || `${platform}-${index}`}
+                  href={href}
+                  title={meta.title}
+                  iconClass={meta.iconClass}
+                  color={meta.color}
+                />
+              );
+            })}
           </div>
         </div>
 
-        {/* Tabs */}
         {hasHomepageLinks || hasFeaturedChannels ? (
           <div className="home-tabs">
             <button className="home-tab-btn active">Links</button>
           </div>
         ) : null}
 
-        {/* Link Posts */}
         {hasHomepageLinks ? (
           <div className="links-section animate-[slideUp_.3s_ease]">
             <div className="links-grid">
@@ -203,7 +229,6 @@ export default function HomepageClient({ settings }) {
           </div>
         ) : null}
 
-        {/* Featured Channels */}
         {hasFeaturedChannels ? (
           <>
             <div className="home-section-divider">Featured Channels</div>
@@ -215,15 +240,12 @@ export default function HomepageClient({ settings }) {
           </>
         ) : null}
 
-        {/* Empty state */}
         {!hasHomepageLinks && !hasFeaturedChannels ? null : null}
 
-        {/* Join CTA */}
         <Link href="/register" className="home-join-btn">
           🛒 Order UC from <span>{siteName}</span>
         </Link>
 
-        {/* Footer */}
         <footer className="home-footer">
           <Link href="#">Privacy</Link>
           <Link href="#">Report</Link>

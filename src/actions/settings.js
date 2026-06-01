@@ -25,15 +25,30 @@ function normalizeLinks(links = []) {
     : [];
 }
 
-function normalizeSocialLinks(socialLinks = {}) {
-  return {
-    whatsapp: socialLinks?.whatsapp || '',
-    youtube: socialLinks?.youtube || '',
-    facebook: socialLinks?.facebook || '',
-    telegram: socialLinks?.telegram || '',
-    twitter: socialLinks?.twitter || '',
-    instagram: socialLinks?.instagram || '',
-  };
+function normalizeSocialLinks(socialLinks = []) {
+  const allowedPlatforms = new Set(['facebook', 'youtube', 'whatsapp', 'telegram', 'twitter', 'instagram']);
+
+  if (Array.isArray(socialLinks)) {
+    return socialLinks
+      .map((link, index) => ({
+        id: String(link?.id || link?._id || `${link?.platform || 'link'}-${index}`),
+        platform: allowedPlatforms.has(link?.platform) ? link.platform : 'facebook',
+        url: String(link?.url || '').trim(),
+      }))
+      .filter((link) => link.url);
+  }
+
+  if (socialLinks && typeof socialLinks === 'object') {
+    return Object.entries(socialLinks)
+      .map(([platform, url], index) => ({
+        id: `${platform}-${index}`,
+        platform: allowedPlatforms.has(platform) ? platform : 'facebook',
+        url: String(url || '').trim(),
+      }))
+      .filter((link) => link.url);
+  }
+
+  return [];
 }
 
 function normalizeSeo(seo = {}) {
@@ -80,7 +95,7 @@ function buildDefaultSettings() {
     favicon: '',
     contactEmail: '',
     whatsappNumber: '',
-    socialLinks: {},
+    socialLinks: [],
     homepageContent: { bio: '', links: [] },
     seo: {},
     featuredChannels: [],
@@ -210,6 +225,42 @@ export async function updateSiteSettings(settingsIdOrData, maybeData) {
   }
 }
 
+export async function updateSocialLinks(settingsIdOrData, maybeSocialLinks) {
+  try {
+    await connectDB();
+
+    const hasId = typeof settingsIdOrData === 'string' || typeof settingsIdOrData === 'object' && settingsIdOrData && settingsIdOrData._id;
+    const settingsId = typeof settingsIdOrData === 'string' ? settingsIdOrData : settingsIdOrData?._id?.toString?.();
+    const socialLinks = normalizeSocialLinks(typeof settingsIdOrData === 'string' ? maybeSocialLinks : settingsIdOrData);
+
+    const settings = hasId && settingsId
+      ? await SiteSettings.findByIdAndUpdate(
+          settingsId,
+          { $set: { socialLinks } },
+          { new: true, runValidators: true }
+        )
+      : await SiteSettings.findOneAndUpdate(
+          {},
+          { $set: { socialLinks }, $setOnInsert: buildDefaultSettings() },
+          { new: true, upsert: true, runValidators: true }
+        );
+
+    if (!settings) {
+      return { success: false, message: 'Settings not found' };
+    }
+
+    revalidateAdminSettings();
+    return {
+      success: true,
+      message: 'Social links saved successfully',
+      settings: serialize(await settings.populate('featuredChannels')),
+    };
+  } catch (error) {
+    console.error('Update social links error:', error);
+    return { success: false, message: error.message || 'Failed to update social links' };
+  }
+}
+
 export async function getAdminDashboardData() {
   try {
     await connectDB();
@@ -270,24 +321,24 @@ export async function createAdminAccount(data) {
   try {
     await connectDB();
 
-    if (!data?.fullName || !data?.whatsappNumber || !data?.password) {
+    const fullName = String(data?.fullName || '').trim();
+    const whatsappNumber = String(data?.whatsappNumber || '').trim();
+    const password = String(data?.password || '');
+
+    if (!fullName || !whatsappNumber || !password) {
       return { success: false, message: 'Full name, WhatsApp number, and password are required' };
     }
 
-    const existing = await User.findOne({ whatsappNumber: data.whatsappNumber });
+    const existing = await User.findOne({ whatsappNumber });
     if (existing) return { success: false, message: 'A user with this WhatsApp number already exists' };
 
-    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const admin = await User.create({
-      fullName: data.fullName,
-      displayName: data.displayName || '',
-      email: data.email || '',
-      whatsappNumber: data.whatsappNumber,
+      fullName,
+      whatsappNumber,
       password: hashedPassword,
       role: 'admin',
-      avatar: data.avatar || '',
-      bio: data.bio || '',
     });
 
     revalidatePath('/admin');
@@ -346,59 +397,80 @@ export async function unbanUser(userId) {
   }
 }
 
-export async function updateAdminProfile(userId, data) {
+function normalizeWhatsappNumber(value = '') {
+  return String(value || '').trim();
+}
+
+async function persistAdminAccount(userId, data = {}) {
+  const user = await User.findById(userId);
+  if (!user) return { success: false, message: 'Admin user not found' };
+
+  const fullName = String(data.fullName || '').trim();
+  const whatsappNumber = normalizeWhatsappNumber(data.whatsappNumber);
+  const passwordInput = String(data.password || '');
+
+  if (!fullName || !whatsappNumber || !passwordInput) {
+    return { success: false, message: 'Full name, WhatsApp number, and password are required' };
+  }
+
+  const duplicate = await User.findOne({
+    whatsappNumber,
+    _id: { $ne: userId },
+  });
+
+  if (duplicate) {
+    return { success: false, message: 'A user with this WhatsApp number already exists' };
+  }
+
+  const passwordMatches = await bcrypt.compare(passwordInput, user.password);
+  if (passwordMatches) {
+    user.fullName = fullName;
+    user.whatsappNumber = whatsappNumber;
+  } else {
+    if (passwordInput.length < 6) {
+      return { success: false, message: 'Password must be at least 6 characters' };
+    }
+
+    user.fullName = fullName;
+    user.whatsappNumber = whatsappNumber;
+    user.password = await bcrypt.hash(passwordInput, 10);
+  }
+
+  await user.save();
+
+  revalidatePath('/admin');
+  revalidatePath('/admin/account');
+  revalidatePath('/admin/users');
+
+  return {
+    success: true,
+    message: 'Account updated successfully',
+    user: serialize(user),
+  };
+}
+
+export async function updateAdminAccount(userId, data) {
   try {
     await connectDB();
-
-    const user = await User.findByIdAndUpdate(
-      userId,
-      {
-        fullName: data?.fullName || '',
-        displayName: data?.displayName || '',
-        bio: data?.bio || '',
-        avatar: data?.avatar || '',
-      },
-      { new: true, runValidators: true }
-    );
-
-    if (!user) return { success: false, message: 'Admin user not found' };
-
-    revalidatePath('/admin');
-    return { success: true, message: 'Profile updated successfully', user: serialize(user) };
+    return await persistAdminAccount(userId, data);
   } catch (error) {
-    console.error('Update admin profile error:', error);
-    return { success: false, message: error.message || 'Failed to update profile' };
+    console.error('Update admin account error:', error);
+    return { success: false, message: error.message || 'Failed to update account' };
   }
 }
 
+export async function updateAdminProfile(userId, data) {
+  return updateAdminAccount(userId, {
+    fullName: data?.fullName,
+    whatsappNumber: data?.whatsappNumber,
+    password: data?.password || data?.currentPassword || data?.newPassword || '',
+  });
+}
+
 export async function updateAdminCredentials(userId, data) {
-  try {
-    await connectDB();
-
-    const user = await User.findById(userId);
-    if (!user) return { success: false, message: 'Admin user not found' };
-
-    if (data?.currentPassword) {
-      const matches = await bcrypt.compare(data.currentPassword, user.password);
-      if (!matches) return { success: false, message: 'Current password is incorrect' };
-    }
-
-    if (data?.newPassword) {
-      if (data.newPassword.length < 6) return { success: false, message: 'New password must be at least 6 characters' };
-      if (data.newPassword !== data.confirmPassword) return { success: false, message: 'Passwords do not match' };
-      user.password = await bcrypt.hash(data.newPassword, 10);
-    }
-
-    if (data?.newEmail) {
-      user.email = data.newEmail.trim().toLowerCase();
-    }
-
-    await user.save();
-
-    revalidatePath('/admin');
-    return { success: true, message: 'Credentials updated successfully', user: serialize(user) };
-  } catch (error) {
-    console.error('Update admin credentials error:', error);
-    return { success: false, message: error.message || 'Failed to update credentials' };
-  }
+  return updateAdminAccount(userId, {
+    fullName: data?.fullName || data?.displayName || '',
+    whatsappNumber: data?.whatsappNumber || '',
+    password: data?.password || data?.currentPassword || data?.newPassword || '',
+  });
 }

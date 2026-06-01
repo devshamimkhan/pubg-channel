@@ -86,7 +86,7 @@ export function publishFaviconHref(href) {
   return nextHref;
 }
 
-export default function FaviconSync() {
+export default function FaviconSync({ initialHref = DEFAULT_FAVICON_HREF }) {
   useEffect(() => {
     const handleFaviconSync = (event) => {
       const href = event?.detail?.href;
@@ -102,7 +102,7 @@ export default function FaviconSync() {
       applyFaviconHref(event.newValue ?? DEFAULT_FAVICON_HREF);
     };
 
-    applyFaviconHref(getStoredFaviconHref());
+    applyFaviconHref(initialHref || getStoredFaviconHref());
 
     window.addEventListener(FAVICON_SYNC_EVENT, handleFaviconSync);
     window.addEventListener("storage", handleStorage);
@@ -111,7 +111,7 @@ export default function FaviconSync() {
       window.removeEventListener(FAVICON_SYNC_EVENT, handleFaviconSync);
       window.removeEventListener("storage", handleStorage);
     };
-  }, []);
+  }, [initialHref]);
 
   return null;
 }

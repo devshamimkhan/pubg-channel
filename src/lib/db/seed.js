@@ -44,7 +44,7 @@ const PostSchema = new mongoose.Schema(
     author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     type: {
       type: String,
-      enum: ['announcement', 'uc-flash-sale', 'royal-pass', 'customer-review', 'text', 'media', 'poll'],
+      enum: ['announcement', 'uc-flash-sale', 'royal-pass', 'customer-review', 'text', 'media'],
       required: true,
     },
     title: { type: String, trim: true },

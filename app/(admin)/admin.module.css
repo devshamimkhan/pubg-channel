@@ -657,6 +657,119 @@
 /* ══════════════════════════════════════
    SOCIAL LINKS
 ══════════════════════════════════════ */
+.socialSectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.socialSectionTitleWrap {
+  min-width: 0;
+  flex: 1 1 240px;
+}
+
+.socialSectionSubtitle {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-sub);
+  line-height: 1.5;
+}
+
+.socialComposer {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card2);
+  padding: 16px;
+  margin-bottom: 18px;
+}
+
+.socialComposerBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.socialComposerMeta {
+  min-width: 0;
+  flex: 1;
+}
+
+.socialComposerLabel {
+  font-size: 11px;
+  color: var(--text-sub);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.socialComposerValue {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-top: 2px;
+}
+
+.socialComposerActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.socialEditingBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(250, 186, 37, 0.12);
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.socialRowActive td {
+  background: rgba(250, 186, 37, 0.05);
+}
+
+.socialIconCol {
+  width: 76px;
+}
+
+.socialActionsCol {
+  width: 132px;
+}
+
+.socialLinkCell {
+  min-width: 0;
+}
+
+.socialLinkPrimary {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.socialLinkSecondary {
+  font-size: 13px;
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
+.socialEmptyState {
+  padding: 20px 14px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 .socialRow {
   display: flex;
   align-items: center;
@@ -677,6 +790,7 @@
 
 .socialFb { background: rgba(24, 119, 242, 0.15); color: #1877f2; }
 .socialYt { background: rgba(255, 0, 0, 0.15); color: #ff0000; }
+.socialWa { background: rgba(37, 211, 102, 0.15); color: #25d366; }
 .socialTg { background: rgba(0, 136, 204, 0.15); color: #0088cc; }
 .socialTw { background: rgba(29, 161, 242, 0.15); color: #1da1f2; }
 .socialIg { background: rgba(225, 48, 108, 0.15); color: #e1306c; }

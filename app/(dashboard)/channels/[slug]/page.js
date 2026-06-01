@@ -8,6 +8,32 @@ import FeedScrollAnchor from '@/components/channel/FeedScrollAnchor';
 import CustomerReviewSection from '@/components/post/templates/CustomerReviewSection';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
+import { createSeoMetadata, getSiteSettingsSnapshot } from '@/lib/seo-metadata';
+
+export async function generateMetadata({ params }) {
+  const { slug } = await params;
+  const [settings, channel] = await Promise.all([getSiteSettingsSnapshot(), getChannelBySlug(slug)]);
+
+  if (!channel) {
+    return createSeoMetadata(settings, {
+      pageTitle: 'Channel not found',
+      pageDescription: 'Requested channel was not found.',
+      canonicalUrl: `/channels/${slug}`,
+      noIndex: true,
+    });
+  }
+
+  return createSeoMetadata(settings, {
+    pageTitle: channel.name || 'Channel',
+    pageDescription: channel.description || 'Latest channel updates and posts.',
+    canonicalUrl: `/channels/${channel.slug || slug}`,
+  });
+}
+
+async function getChannelBySlug(slug) {
+  await connectDB();
+  return Channel.findOne({ slug }).lean();
+}
 
 export default async function ChannelFeedPage({ params }) {
   await connectDB();
